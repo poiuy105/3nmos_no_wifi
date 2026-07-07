@@ -236,7 +236,10 @@ static esp_err_t reset_handler(httpd_req_t *req)
 // Captive Portal：已知检测 URL 返回 204
 static esp_err_t captive_handler(httpd_req_t *req)
 {
-    httpd_resp_set_status(req, "204 No Content");
+    // 返回 302 重定向到配置页：让系统认为"需要网页登录" → 弹出 captive portal 通知
+    // （返回 204 等于告诉系统"能上网"，反而不弹）
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_hdr(req, "Location", "/");
     httpd_resp_send(req, NULL, 0);
     return ESP_OK;
 }
@@ -277,6 +280,7 @@ static void dns_server_task(void *pv)
     if (bind(sock, (struct sockaddr *)&dest, sizeof(dest)) < 0) {
         ESP_LOGE(TAG, "dns bind fail"); closesocket(sock); vTaskDelete(NULL); return;
     }
+    ESP_LOGI(TAG, "DNS hijack listening on 0.0.0.0:53");
 
     struct timeval to = { .tv_sec = 10, .tv_usec = 0 };
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &to, sizeof(to));
@@ -287,6 +291,7 @@ static void dns_server_task(void *pv)
     while (1) {
         int len = recvfrom(sock, rx, sizeof(rx), 0, (struct sockaddr *)&src, &slen);
         if (len <= 0) continue;
+        ESP_LOGI(TAG, "DNS query from %s (%d bytes)", inet_ntoa(src.sin_addr), len);
 
         char resp[512];
         memcpy(resp, rx, len);

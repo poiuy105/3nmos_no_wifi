@@ -2,6 +2,7 @@
 #include "nvs_param.h"
 #include "board.h"
 #include "driver/ledc.h"
+#include "soc/soc_caps.h"
 #include "esp_log.h"
 #include "esp_idf_version.h"
 
@@ -25,7 +26,7 @@ static int      s_cur_res[PWM_CH_CNT];
 static int pick_resolution(uint32_t freq)
 {
     if (freq == 0) freq = 1;
-    for (int res = 20; res >= 1; res--) {
+    for (int res = SOC_LEDC_TIMER_BIT_WIDTH; res >= 1; res--) {   // 受芯片位宽上限约束（C3=14, S3=20）
         uint64_t denom = (uint64_t)freq << res;          // freq * 2^res
         if (denom == 0) continue;
         // div = 80e6 / denom，要求 2 <= div <= 1024
@@ -34,7 +35,7 @@ static int pick_resolution(uint32_t freq)
             return res;
         }
     }
-    return 10;   // 兜底
+    return SOC_LEDC_TIMER_BIT_WIDTH;   // 兜底，不超过芯片上限
 }
 
 // 占空比 ×10（500=50.0%）→ res 下的 tick；若 pwm_inv 则取反

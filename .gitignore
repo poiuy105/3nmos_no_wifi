@@ -34,3 +34,6 @@ Thumbs.db
 
 # Downloaded firmware artifacts (local only)
 downloaded_firmware/
+
+# Debug logs
+logs.txt

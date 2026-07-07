@@ -27,7 +27,7 @@ static void led_blink_task(void *arg)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "=== 3NMOS PWM Controller (ESP32-S3) ===");
+    ESP_LOGI(TAG, "=== 3NMOS PWM Controller (" CONFIG_IDF_TARGET ") ===");
 
     // NVS
     esp_err_t ret = nvs_flash_init();
