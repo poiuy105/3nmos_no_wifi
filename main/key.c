@@ -1,5 +1,6 @@
 #include "key.h"
 #include "app.h"
+#include "temp_monitor.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
@@ -49,24 +50,27 @@ static void key_task(void *arg)
                 uint32_t held_ms = (uint32_t)(now - t0) * portTICK_PERIOD_MS;
                 if (held_ms >= LONG_PRESS_MS) {
                     // 长按达标：LED 常亮 1s → 置标志 → 重启进配置
-                    gpio_set_level(LED_PIN, 0);   // 点亮
+                    if (!temp_monitor_is_overtemp()) gpio_set_level(LED_PIN, 0);   // 点亮（过温时让 temp 任务管 LED）
                     ESP_LOGW(TAG, "long-press 5s -> restart into config");
                     s_rtc_magic = RTC_MAGIC;
                     s_rtc_enter_cfg = 1;
                     vTaskDelay(pdMS_TO_TICKS(1000));
                     esp_restart();
                 }
-                // 计时中：LED 快闪反馈
-                if ((uint32_t)(now - last_toggle) * portTICK_PERIOD_MS >= FAST_TOGGLE_MS) {
+                // 计时中：LED 快闪反馈（过温时不碰 LED，由温度任务 1Hz 闪烁）
+                if (!temp_monitor_is_overtemp() &&
+                    (uint32_t)(now - last_toggle) * portTICK_PERIOD_MS >= FAST_TOGGLE_MS) {
                     led_on = !led_on;
                     gpio_set_level(LED_PIN, led_on ? 0 : 1);
                     last_toggle = now;
                 }
             } else {
-                // 松开 = 短按：LED 亮 50ms 反馈，随后熄灭
-                gpio_set_level(LED_PIN, 0);
-                vTaskDelay(pdMS_TO_TICKS(50));
-                gpio_set_level(LED_PIN, 1);
+                // 松开 = 短按：LED 亮 50ms 反馈，随后熄灭（过温时跳过，避免与温度任务抢 LED）
+                if (!temp_monitor_is_overtemp()) {
+                    gpio_set_level(LED_PIN, 0);
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    gpio_set_level(LED_PIN, 1);
+                }
                 state = 0;
                 ESP_LOGI(TAG, "short press");
             }

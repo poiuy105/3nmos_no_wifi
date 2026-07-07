@@ -6,14 +6,15 @@
 static const char *TAG = "NVS";
 #define NAMESPACE "user_cfg"
 
-uint8_t  cfg_ok    = 0;
-uint8_t  in_pin    = 10;
-uint8_t  in_inv    = 0;
-uint8_t  pwm_inv   = 0;
+uint8_t  cfg_ok      = 0;
+uint8_t  in_pin      = 10;
+uint8_t  in_inv      = 0;
+uint8_t  pwm_inv     = 0;
 uint32_t pwm_freq[PWM_CH_CNT][2] = {{1000, 1000}, {1000, 1000}, {1000, 1000}};
 uint16_t pwm_duty[PWM_CH_CNT][2] = {{500, 500}, {500, 500}, {500, 500}};
-uint16_t t_rise_ms = 300;
-uint16_t t_fall_ms = 300;
+uint16_t t_rise_ms   = 300;
+uint16_t t_fall_ms   = 300;
+int16_t  temp_thresh = 100;       // 过温阈值 °C
 
 // NVS key：3 路 × 2 状态 的频率与占空比
 static const char *k_freq[3][2] = {{"f0l", "f0h"}, {"f1l", "f1h"}, {"f2l", "f2h"}};
@@ -21,18 +22,19 @@ static const char *k_duty[3][2] = {{"d0l", "d0h"}, {"d1l", "d1h"}, {"d2l", "d2h"
 
 void nvs_load_defaults(void)
 {
-    cfg_ok  = 0;
-    in_pin  = 10;
-    in_inv  = 0;
-    pwm_inv = 0;
+    cfg_ok      = 0;
+    in_pin      = 10;
+    in_inv      = 0;
+    pwm_inv     = 0;
     for (int c = 0; c < PWM_CH_CNT; c++) {
         for (int s = 0; s < 2; s++) {
             pwm_freq[c][s] = 1000;   // 1 kHz
             pwm_duty[c][s] = 500;    // 50.0%
         }
     }
-    t_rise_ms = 300;
-    t_fall_ms = 300;
+    t_rise_ms   = 300;
+    t_fall_ms   = 300;
+    temp_thresh = 100;
 }
 
 void nvs_read_all_param(void)
@@ -59,14 +61,17 @@ void nvs_read_all_param(void)
     }
     nvs_get_u16(h, "t_rise", &t_rise_ms);
     nvs_get_u16(h, "t_fall", &t_fall_ms);
+    nvs_get_i16(h, "tthr",   &temp_thresh);
 
     nvs_close(h);
 
     // 合法性钳制
     if (in_pin != 9 && in_pin != 10) in_pin = 10;
+    if (temp_thresh < 0)   temp_thresh = 0;
+    if (temp_thresh > 125) temp_thresh = 125;
 
-    ESP_LOGI(TAG, "loaded: cfg_ok=%d in_pin=%d in_inv=%d pwm_inv=%d trise=%d tfall=%d",
-             cfg_ok, in_pin, in_inv, pwm_inv, t_rise_ms, t_fall_ms);
+    ESP_LOGI(TAG, "loaded: cfg_ok=%d in_pin=%d inv=%d/%d trise=%d tfall=%d tthr=%d",
+             cfg_ok, in_pin, in_inv, pwm_inv, t_rise_ms, t_fall_ms, temp_thresh);
 }
 
 void nvs_save_all_param(void)
@@ -90,6 +95,7 @@ void nvs_save_all_param(void)
     }
     nvs_set_u16(h, "t_rise", t_rise_ms);
     nvs_set_u16(h, "t_fall", t_fall_ms);
+    nvs_set_i16(h, "tthr",   temp_thresh);
 
     nvs_commit(h);
     nvs_close(h);

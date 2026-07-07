@@ -9,6 +9,7 @@
 #include "pwm_ctrl.h"
 #include "input_sig.h"
 #include "config_portal.h"
+#include "temp_monitor.h"
 #include "key.h"
 
 static const char *TAG = "MAIN";
@@ -67,6 +68,7 @@ void app_main(void)
         bool hi = input_sig_read_logical();     // 读当前输入电平
         pwm_ctrl_apply_state(hi, true);         // 上电立即输出（无 fade）
         input_sig_start();                      // 启动轮询 + 平滑切换
+        temp_monitor_start();                   // DS18B20 过温监测（超阈值时 3 路+LED 提示）
         key_task_start();                       // 按键常驻任务
         // 工作模式：LED 保持熄灭
     }

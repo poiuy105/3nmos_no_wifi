@@ -11,4 +11,7 @@ void pwm_ctrl_init(void);
 // instant=true 时不做 fade（上电立即生效），false 时按 t_rise/t_fall 平滑切换占空比。
 void pwm_ctrl_apply_state(bool logical_high, bool instant);
 
+// 过温提示：on=true 时把 3 路切到 1Hz/50% 方波；off 时由调用方 pwm_ctrl_apply_state() 恢复
+void pwm_ctrl_overtemp_alert(bool on);
+
 #endif

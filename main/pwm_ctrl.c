@@ -138,3 +138,14 @@ void pwm_ctrl_apply_state(bool logical_high, bool instant)
         channel_apply(c, pwm_freq[c][state], pwm_duty[c][state], T);
     }
 }
+
+void pwm_ctrl_overtemp_alert(bool on)
+{
+    if (on) {
+        ESP_LOGW(TAG, "over-temp alert: 3ch -> 1Hz/50%%");
+        for (int c = 0; c < PWM_CH_CNT; c++) {
+            channel_apply(c, 1, 500, 0);   // 1Hz, 50.0%, 瞬切
+        }
+    }
+    // off: 由调用方 pwm_ctrl_apply_state() 恢复当前输入状态
+}

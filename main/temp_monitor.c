@@ -1,0 +1,125 @@
+#include "temp_monitor.h"
+#include "app.h"            // LED_PIN
+#include "nvs_param.h"      // temp_thresh
+#include "pwm_ctrl.h"
+#include "input_sig.h"      // input_sig_read_logical (恢复输出时用)
+#include "onewire_bus.h"
+#include "ds18b20.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
+#include "esp_timer.h"
+#include "esp_log.h"
+#include "esp_err.h"
+
+static const char *TAG = "TEMP";
+
+#define HYSTERESIS_DEG   5                // 解除滞后 °C
+#define SAMPLE_PERIOD_MS 2000             // 采样周期
+#define ALERT_TOGGLE_US  500000           // LED 翻转 500ms -> 1Hz/50%
+
+static volatile bool  s_overtemp  = false;
+static volatile float s_last_temp = TEMP_FAULT_VALUE;
+static ds18b20_device_handle_t s_ds = NULL;
+static esp_timer_handle_t s_led_timer = NULL;
+static volatile bool s_led_on = false;
+
+bool  temp_monitor_is_overtemp(void) { return s_overtemp; }
+float temp_monitor_get_temp(void)    { return s_last_temp; }
+
+// 独立定时器翻转 LED，避免被 DS18B20 750ms 转换阻塞影响
+static void led_timer_cb(void *arg)
+{
+    s_led_on = !s_led_on;
+    gpio_set_level(LED_PIN, s_led_on ? 0 : 1);   // 低电平点亮
+}
+
+static esp_err_t init_ds18b20(void)
+{
+    onewire_bus_handle_t bus = NULL;
+    onewire_bus_config_t bus_cfg = { .bus_gpio_num = TEMP_SENSOR_GPIO };
+    onewire_bus_rmt_config_t rmt_cfg = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .resolution_hz = 1000000,
+    };
+    esp_err_t err = onewire_new_bus_rmt(&bus_cfg, &rmt_cfg, &bus);
+    if (err != ESP_OK) { ESP_LOGE(TAG, "1-wire bus fail: %s", esp_err_to_name(err)); return err; }
+
+    onewire_device_iter_handle_t iter = NULL;
+    onewire_new_device_iter(bus, &iter);
+    onewire_device_t dev;
+    err = onewire_device_iter_get_next(iter, &dev);
+    if (err != ESP_OK) { ESP_LOGE(TAG, "no 1-wire device found"); return err; }
+    ESP_LOGI(TAG, "1-wire device family=0x%02x", dev.family_code);
+
+    ds18b20_config_t dcfg = {0};
+    err = ds18b20_new_device(&dev, &dcfg, &s_ds);
+    if (err != ESP_OK) { ESP_LOGE(TAG, "ds18b20 init fail"); return err; }
+    ds18b20_set_resolution(s_ds, DS18B20_RESOLUTION_12B);
+    return ESP_OK;
+}
+
+static esp_err_t read_temp(float *out)
+{
+    if (!s_ds) return ESP_FAIL;
+    esp_err_t err = ds18b20_trigger_temperature_conversion(s_ds);
+    if (err != ESP_OK) return err;
+    vTaskDelay(pdMS_TO_TICKS(750));                 // 12bit 转换时间
+    return ds18b20_get_temperature(s_ds, out);
+}
+
+static void temp_task(void *arg)
+{
+    bool sensor_ok = (init_ds18b20() == ESP_OK);
+    if (!sensor_ok) ESP_LOGW(TAG, "DS18B20 unavailable, over-temp protection disabled");
+
+    bool alert = false;
+
+    while (1) {
+        if (sensor_ok) {
+            float t;
+            if (read_temp(&t) == ESP_OK) {
+                s_last_temp = t;
+                ESP_LOGI(TAG, "temp=%.1fC thr=%d %s", t, temp_thresh, alert ? "ALERT" : "ok");
+                // 带滞后的状态机
+                if (!alert && t > (float)temp_thresh) {
+                    alert = true;
+                    ESP_LOGW(TAG, "OVER-TEMP ON (t=%.1f > %d)", t, temp_thresh);
+                } else if (alert && t < (float)(temp_thresh - HYSTERESIS_DEG)) {
+                    alert = false;
+                    ESP_LOGW(TAG, "OVER-TEMP OFF (t=%.1f < %d)", t, temp_thresh - HYSTERESIS_DEG);
+                }
+            } else {
+                ESP_LOGW(TAG, "read failed, keep state (alert=%d)", alert);   // 故障忽略
+            }
+        }
+
+        // 进入/退出提示
+        if (alert && !s_overtemp) {
+            s_overtemp = true;
+            s_led_on = true;
+            gpio_set_level(LED_PIN, 0);                 // 立即点亮
+            esp_timer_start_periodic(s_led_timer, ALERT_TOGGLE_US);
+            pwm_ctrl_overtemp_alert(true);
+        } else if (!alert && s_overtemp) {
+            s_overtemp = false;
+            esp_timer_stop(s_led_timer);
+            gpio_set_level(LED_PIN, 1);                 // 熄灭（恢复工作态）
+            pwm_ctrl_overtemp_alert(false);
+            pwm_ctrl_apply_state(input_sig_read_logical(), true);   // 恢复当前输入对应输出
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(SAMPLE_PERIOD_MS));
+    }
+}
+
+void temp_monitor_start(void)
+{
+    const esp_timer_create_args_t tcfg = {
+        .callback = led_timer_cb,
+        .name = "ot_led"
+    };
+    esp_timer_create(&tcfg, &s_led_timer);
+
+    xTaskCreate(temp_task, "temp", 4096, NULL, 5, NULL);
+}

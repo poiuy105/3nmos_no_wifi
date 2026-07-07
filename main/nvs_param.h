@@ -15,6 +15,7 @@ extern uint32_t pwm_freq[PWM_CH_CNT][2];    // [ch][lo/hi] 频率 Hz
 extern uint16_t pwm_duty[PWM_CH_CNT][2];    // [ch][lo/hi] 占空比 ×10（500=50.0%）
 extern uint16_t t_rise_ms;                  // 低→高 平滑切换时间 ms
 extern uint16_t t_fall_ms;                  // 高→低 平滑切换时间 ms
+extern int16_t  temp_thresh;                // 过温阈值 °C（默认 100）
 
 void nvs_read_all_param(void);
 void nvs_save_all_param(void);
