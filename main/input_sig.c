@@ -55,6 +55,9 @@ static void input_sig_task(void *arg)
                 pwm_ctrl_apply_state(last, false);   // 平滑切换
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+        // 注意：POLL_MS=5 在默认 100Hz tick 下 pdMS_TO_TICKS(5)=0，vTaskDelay(0) 只 yield 不阻塞，
+        // 会让本任务近似忙等、饿死 IDLE 看门狗。这里保证至少 1 个 tick（默认即 10ms）。
+        TickType_t poll_tick = pdMS_TO_TICKS(POLL_MS);
+        vTaskDelay(poll_tick ? poll_tick : 1);
     }
 }

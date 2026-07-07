@@ -118,6 +118,10 @@ void pwm_ctrl_apply_state(bool logical_high, bool instant)
 
     int steps = instant ? 1 : FADE_STEPS;
     uint32_t step_ms = (!instant && T / steps > 0) ? (T / steps) : 1;
+    // step_ms<10（默认 100Hz tick）时 pdMS_TO_TICKS 为 0，vTaskDelay(0) 只 yield 不阻塞，
+    // 会让渐变循环近似忙等、饿死 IDLE 看门狗。这里保证至少 1 个 tick。
+    TickType_t step_tick = pdMS_TO_TICKS(step_ms);
+    if (!instant && step_tick == 0) step_tick = 1;
 
     for (int i = 1; i <= steps; i++) {
         for (int c = 0; c < PWM_CH_CNT; c++) {
@@ -125,7 +129,7 @@ void pwm_ctrl_apply_state(bool logical_high, bool instant)
             ledc_set_duty(LEDC_SPEED, s_chan[c], (uint32_t)d);
             ledc_update_duty(LEDC_SPEED, s_chan[c]);
         }
-        if (!instant) vTaskDelay(pdMS_TO_TICKS(step_ms));
+        if (!instant) vTaskDelay(step_tick);
     }
 
     ESP_LOGD(TAG, "apply %s-state (fade=%lu ms)", logical_high ? "HIGH" : "LOW", (unsigned long)T);
