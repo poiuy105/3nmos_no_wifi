@@ -1,5 +1,6 @@
 #include "nvs_param.h"
 #include "nvs_flash.h"
+#include "board.h"
 #include "esp_log.h"
 #include <string.h>
 
@@ -66,7 +67,7 @@ void nvs_read_all_param(void)
     nvs_close(h);
 
     // 合法性钳制
-    if (in_pin != 9 && in_pin != 10) in_pin = 10;
+    if (in_pin != PIN_IN1 && in_pin != PIN_IN2) in_pin = PIN_IN1;
     if (temp_thresh < 0)   temp_thresh = 0;
     if (temp_thresh > 125) temp_thresh = 125;
 

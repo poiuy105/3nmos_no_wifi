@@ -2,8 +2,9 @@
 #define TEMP_MONITOR_H
 
 #include <stdbool.h>
+#include "board.h"
 
-#define TEMP_SENSOR_GPIO  14            // DS18B20 数据线
+#define TEMP_SENSOR_GPIO  PIN_DS18B20   // DS18B20 数据线
 #define TEMP_FAULT_VALUE  (-1000.0f)    // 读取故障时的占位温度
 
 // 初始化 DS18B20 并启动温度监测任务（工作模式调用）

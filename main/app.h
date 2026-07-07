@@ -1,10 +1,10 @@
 #ifndef APP_H
 #define APP_H
 
-#include "driver/gpio.h"
+#include "board.h"
 
-#define LED_PIN  GPIO_NUM_15   // 低电平点亮
-#define KEY_PIN  GPIO_NUM_0    // 内部上拉，按下拉低
+#define LED_PIN  PIN_LED   // 低电平点亮
+#define KEY_PIN  PIN_KEY   // 内部上拉，按下拉低
 
 void app_main(void);
 

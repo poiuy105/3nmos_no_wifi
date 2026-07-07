@@ -8,6 +8,7 @@
 #include "esp_system.h"
 #include "nvs_param.h"
 #include "temp_monitor.h"
+#include "board.h"
 #include "cJSON.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -79,8 +80,13 @@ static const char index_html[] =
 "<h2>3NMOS PWM 控制器配置</h2>"
 "<div class='c'>"
 "<div class='r'><label>输入信号引脚</label><span class='seg'>"
+#if CONFIG_IDF_TARGET_ESP32S3
 "<label><input type='radio' name='ip' value='10' checked>GPIO10</label>"
 "<label><input type='radio' name='ip' value='9'>GPIO9</label></span></div>"
+#else
+"<label><input type='radio' name='ip' value='6' checked>GPIO6</label>"
+"<label><input type='radio' name='ip' value='7'>GPIO7</label></span></div>"
+#endif
 "<div class='r'><label>输入电平反向</label><input type='checkbox' id='ii'></div>"
 "<div class='r'><label>PWM 极性反向</label><input type='checkbox' id='pi'></div>"
 "</div>"
@@ -169,7 +175,7 @@ static esp_err_t save_handler(httpd_req_t *req)
     if (!root) return send_json_err(req, "JSON 格式错误");
 
     cJSON *j;
-    j = cJSON_GetObjectItem(root, "in_pin");  if (j) in_pin  = (j->valueint == 9) ? 9 : 10;
+    j = cJSON_GetObjectItem(root, "in_pin");  if (j) in_pin  = (j->valueint == PIN_IN2) ? PIN_IN2 : PIN_IN1;
     j = cJSON_GetObjectItem(root, "in_inv");  if (j) in_inv  = (j->valueint != 0) ? 1 : 0;
     j = cJSON_GetObjectItem(root, "pwm_inv"); if (j) pwm_inv = (j->valueint != 0) ? 1 : 0;
 

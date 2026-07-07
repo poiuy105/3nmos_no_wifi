@@ -1,5 +1,6 @@
 #include "pwm_ctrl.h"
 #include "nvs_param.h"
+#include "board.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "esp_idf_version.h"
@@ -13,7 +14,7 @@ static const char *TAG = "PWM";
 // PWM1=GPIO48, PWM2=GPIO21, PWM3=GPIO47
 static const ledc_timer_t   s_timer[PWM_CH_CNT] = {LEDC_TIMER_0, LEDC_TIMER_1, LEDC_TIMER_2};
 static const ledc_channel_t s_chan[PWM_CH_CNT]  = {LEDC_CHANNEL_0, LEDC_CHANNEL_1, LEDC_CHANNEL_2};
-static const int            s_gpio[PWM_CH_CNT]  = {48, 21, 47};
+static const int            s_gpio[PWM_CH_CNT]  = {PIN_PWM1, PIN_PWM2, PIN_PWM3};
 
 // 每通道当前生效的频率与分辨率（用于切换时判断/缩放）
 static uint32_t s_cur_freq[PWM_CH_CNT];

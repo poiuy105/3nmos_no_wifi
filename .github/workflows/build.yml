@@ -7,6 +7,10 @@ on:
 
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [esp32s3, esp32c3]
     runs-on: ubuntu-latest
     container:
       image: espressif/idf:release-v5.2
@@ -18,10 +22,10 @@ jobs:
         run: |
           git config --global --add safe.directory '*'
           . /opt/esp/idf/export.sh
-          idf.py set-target esp32s3
+          idf.py set-target ${{ matrix.target }}
           idf.py build
           cd build
-          esptool.py --chip esp32s3 merge_bin -o merged.bin \
+          esptool.py --chip ${{ matrix.target }} merge_bin -o merged.bin \
             0x0 bootloader/bootloader.bin \
             0x8000 partition_table/partition-table.bin \
             0x10000 3nmos_no_wifi.bin
@@ -29,5 +33,5 @@ jobs:
       - name: Upload merged.bin
         uses: actions/upload-artifact@v4
         with:
-          name: merged-firmware
+          name: merged-firmware-${{ matrix.target }}
           path: build/merged.bin
