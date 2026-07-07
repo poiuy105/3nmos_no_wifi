@@ -49,9 +49,9 @@ static esp_err_t init_ds18b20(void)
     onewire_device_t dev;
     err = onewire_device_iter_get_next(iter, &dev);
     if (err != ESP_OK) { ESP_LOGE(TAG, "no 1-wire device found"); return err; }
-    ESP_LOGI(TAG, "1-wire device family=0x%02x", dev.family_code);
+    ESP_LOGI(TAG, "1-wire device address=0x%016llX", (unsigned long long)dev.address);
 
-    ds18b20_config_t dcfg = {0};
+    ds18b20_config_t dcfg;
     err = ds18b20_new_device(&dev, &dcfg, &s_ds);
     if (err != ESP_OK) { ESP_LOGE(TAG, "ds18b20 init fail"); return err; }
     ds18b20_set_resolution(s_ds, DS18B20_RESOLUTION_12B);
