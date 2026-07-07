@@ -31,3 +31,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Downloaded firmware artifacts (local only)
+downloaded_firmware/
