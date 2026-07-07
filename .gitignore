@@ -1,0 +1,33 @@
+# Build directory
+build/
+
+# ESP-IDF configuration files
+sdkconfig
+sdkconfig.old
+sdkconfig.ci
+sdkconfig.defaults.bak
+
+# Python
+*.pyc
+__pycache__/
+*.pyo
+
+# IDE
+.vscode/
+.claude/
+.idea/
+*.swp
+*.swo
+.codeartsdoer/
+*~
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
