@@ -18,7 +18,7 @@ void input_sig_init(void)
     gpio_config_t io = {0};
     io.pin_bit_mask = (1ULL << in_pin);
     io.mode = GPIO_MODE_INPUT;
-    io.pull_up_en   = GPIO_PULLUP_DISABLE;    // 由外部信号驱动
+    io.pull_up_en   = GPIO_PULLUP_ENABLE;     // 内部上拉：悬空时稳定高电平，避免浮空抖动刷屏/喂狗失败
     io.pull_down_en = GPIO_PULLDOWN_DISABLE;
     gpio_config(&io);
     ESP_LOGI(TAG, "init pin=GPIO%d inv=%d", in_pin, in_inv);
@@ -51,7 +51,7 @@ static void input_sig_task(void *arg)
             debounce += POLL_MS;
             if (debounce >= DEBOUNCE_MS) {
                 last = candidate;
-                ESP_LOGI(TAG, "logical level -> %s", last ? "HIGH" : "LOW");
+                ESP_LOGD(TAG, "logical level -> %s", last ? "HIGH" : "LOW");
                 pwm_ctrl_apply_state(last, false);   // 平滑切换
             }
         }

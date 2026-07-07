@@ -134,7 +134,7 @@ void pwm_ctrl_apply_state(bool logical_high, bool instant)
     int state = logical_high ? PWM_STATE_HI : PWM_STATE_LO;
     uint32_t T = instant ? 0 : (logical_high ? t_rise_ms : t_fall_ms);
 
-    ESP_LOGI(TAG, "apply %s-state (fade=%lu ms)", logical_high ? "HIGH" : "LOW", (unsigned long)T);
+    ESP_LOGD(TAG, "apply %s-state (fade=%lu ms)", logical_high ? "HIGH" : "LOW", (unsigned long)T);
 
     for (int c = 0; c < PWM_CH_CNT; c++) {
         channel_apply(c, pwm_freq[c][state], pwm_duty[c][state], T);
