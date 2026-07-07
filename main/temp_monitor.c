@@ -39,8 +39,7 @@ static esp_err_t init_ds18b20(void)
     onewire_bus_handle_t bus = NULL;
     onewire_bus_config_t bus_cfg = { .bus_gpio_num = TEMP_SENSOR_GPIO };
     onewire_bus_rmt_config_t rmt_cfg = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = 1000000,
+        .max_rx_bytes = 10,   // 1 字节 ROM 命令 + 8 字节 ROM 号 + 1 字节设备命令
     };
     esp_err_t err = onewire_new_bus_rmt(&bus_cfg, &rmt_cfg, &bus);
     if (err != ESP_OK) { ESP_LOGE(TAG, "1-wire bus fail: %s", esp_err_to_name(err)); return err; }
