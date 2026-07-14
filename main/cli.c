@@ -27,6 +27,8 @@ static volatile bool s_work_mode = true;
 #define CLI_LINE_MAX 256
 #define CLI_ARGV_MAX 8
 
+static void cli_task(void *arg);   // 前向声明（cli_start 引用）
+
 void cli_start(bool work_mode)
 {
     s_work_mode = work_mode;
