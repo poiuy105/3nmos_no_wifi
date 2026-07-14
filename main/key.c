@@ -27,6 +27,15 @@ bool key_consume_enter_config(void)
     return false;
 }
 
+// 置 RTC 标志并立即重启 → 下次启动 key_consume_enter_config() 返回 true，进入 WiFi 配置模式。
+// 供 CLI 的 `config-mode` 命令复用，避免 CLI 直接触碰 static 的 RTC 标志。
+void key_enter_config_mode(void)
+{
+    s_rtc_magic     = RTC_MAGIC;
+    s_rtc_enter_cfg = 1;
+    esp_restart();
+}
+
 static void key_task(void *arg)
 {
     int state = 0;                 // 0=IDLE, 1=PRESSED

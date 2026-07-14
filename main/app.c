@@ -11,6 +11,7 @@
 #include "config_portal.h"
 #include "temp_monitor.h"
 #include "key.h"
+#include "cli.h"
 
 static const char *TAG = "MAIN";
 
@@ -60,16 +61,18 @@ void app_main(void)
     if (go_config) {
         ESP_LOGI(TAG, ">>> CONFIG MODE");
         xTaskCreate(led_blink_task, "led_cfg", 1024, NULL, 2, NULL);
+        cli_start(false);                          // 串口 CLI（CONFIG 模式：仅查询/debug/系统操作）
         config_portal_start();   // 阻塞：保存/重置后内部 esp_restart() 不返回
     } else {
         ESP_LOGI(TAG, ">>> WORK MODE");
-        input_sig_init();                       // 配置输入信号引脚
-        pwm_ctrl_init();                        // 3 路 LEDC
-        bool hi = input_sig_read_logical();     // 读当前输入电平
-        pwm_ctrl_apply_state(hi, true);         // 上电立即输出（无 fade）
-        input_sig_start();                      // 启动轮询 + 平滑切换
-        temp_monitor_start();                   // DS18B20 过温监测（超阈值时 3 路+LED 提示）
-        key_task_start();                       // 按键常驻任务
+        input_sig_init();                        // 配置输入信号引脚
+        pwm_ctrl_init();                         // 3 路 LEDC
+        bool hi = input_sig_read_logical();      // 读当前输入电平
+        pwm_ctrl_apply_state(hi, true);          // 上电立即输出（无 fade）
+        input_sig_start();                       // 启动轮询 + 平滑切换
+        temp_monitor_start();                    // DS18B20 过温监测（超阈值时 3 路+LED 提示）
+        key_task_start();                        // 按键常驻任务
+        cli_start(true);                         // 串口 CLI（WORK 模式：全命令可用）
         // 工作模式：LED 保持熄灭
     }
 }

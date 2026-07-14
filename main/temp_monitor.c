@@ -11,6 +11,7 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "cli.h"
 
 static const char *TAG = "TEMP";
 
@@ -79,7 +80,7 @@ static void temp_task(void *arg)
             float t;
             if (read_temp(&t) == ESP_OK) {
                 s_last_temp = t;
-                ESP_LOGI(TAG, "temp=%.1fC thr=%d %s", t, temp_thresh, alert ? "ALERT" : "ok");
+                CLI_DEBUG(TAG, "temp=%.1fC thr=%d alert=%d", t, temp_thresh, alert);
                 // 带滞后的状态机
                 if (!alert && t > (float)temp_thresh) {
                     alert = true;

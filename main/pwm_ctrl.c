@@ -5,7 +5,9 @@
 #include "soc/soc_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_log.h"
+#include "cli.h"
 
 static const char *TAG = "PWM";
 
@@ -20,6 +22,14 @@ static const int            s_gpio[PWM_CH_CNT]  = {PIN_PWM1, PIN_PWM2, PIN_PWM3}
 
 static uint32_t s_cur_freq[PWM_CH_CNT];
 static int      s_cur_res[PWM_CH_CNT];
+
+// PWM 操作互斥锁（递归 + 优先级继承）：保护 apply_state/set_channel/overtemp_alert，
+// 串行化所有 PWM 切换，消除与 input_sig/temp_monitor 任务的 LEDC 寄存器竞态。
+static StaticSemaphore_t s_mtx_buf;
+static SemaphoreHandle_t s_pwm_mtx;
+
+void pwm_ctrl_lock(void)   { if (s_pwm_mtx) xSemaphoreTakeRecursive(s_pwm_mtx, portMAX_DELAY); }
+void pwm_ctrl_unlock(void) { if (s_pwm_mtx) xSemaphoreGiveRecursive(s_pwm_mtx); }
 
 // 动态选择 duty_resolution：从芯片最大位宽向下找满足 2<=div<=1024 的最大 res
 static int pick_resolution(uint32_t freq)
@@ -74,6 +84,8 @@ static uint32_t channel_prep(int c, uint32_t freq_B, uint16_t duty_B_x10)
 
 void pwm_ctrl_init(void)
 {
+    s_pwm_mtx = xSemaphoreCreateRecursiveMutexStatic(&s_mtx_buf);
+
     for (int c = 0; c < PWM_CH_CNT; c++) {
         uint32_t f = pwm_freq[c][PWM_STATE_LO];
         int res = pick_resolution(f);
@@ -107,6 +119,7 @@ void pwm_ctrl_init(void)
 // 软件渐变：在调用任务上下文里逐步 set_duty，每步 vTaskDelay 让出 CPU，避免饿死 IDLE 看门狗
 void pwm_ctrl_apply_state(bool logical_high, bool instant)
 {
+    pwm_ctrl_lock();
     int state = logical_high ? PWM_STATE_HI : PWM_STATE_LO;
     uint32_t T = instant ? 0 : (logical_high ? t_rise_ms : t_fall_ms);
 
@@ -118,6 +131,10 @@ void pwm_ctrl_apply_state(bool logical_high, bool instant)
 
     int steps = instant ? 1 : FADE_STEPS;
     uint32_t step_ms = (!instant && T / steps > 0) ? (T / steps) : 1;
+    // step_ms<10（默认 100Hz tick）时 pdMS_TO_TICKS 为 0，vTaskDelay(0) 只 yield 不阻塞，
+    // 会让渐变循环近似忙等、饿死 IDLE 看门狗。这里保证至少 1 个 tick。
+    TickType_t step_tick = pdMS_TO_TICKS(step_ms);
+    if (!instant && step_tick == 0) step_tick = 1;
 
     for (int i = 1; i <= steps; i++) {
         for (int c = 0; c < PWM_CH_CNT; c++) {
@@ -125,14 +142,18 @@ void pwm_ctrl_apply_state(bool logical_high, bool instant)
             ledc_set_duty(LEDC_SPEED, s_chan[c], (uint32_t)d);
             ledc_update_duty(LEDC_SPEED, s_chan[c]);
         }
-        if (!instant) vTaskDelay(pdMS_TO_TICKS(step_ms));
+        if (!instant) vTaskDelay(step_tick);
     }
 
-    ESP_LOGD(TAG, "apply %s-state (fade=%lu ms)", logical_high ? "HIGH" : "LOW", (unsigned long)T);
+    CLI_DEBUG(TAG, "apply %s-state fade=%lums duty=[%lu %lu %lu]",
+              logical_high ? "HI" : "LO", (unsigned long)T,
+              (unsigned long)target[0], (unsigned long)target[1], (unsigned long)target[2]);
+    pwm_ctrl_unlock();
 }
 
 void pwm_ctrl_overtemp_alert(bool on)
 {
+    pwm_ctrl_lock();
     if (on) {
         ESP_LOGW(TAG, "over-temp alert: 3ch -> 5Hz/50%%");
         // C3 LEDC 最低频率约 5Hz，用 5Hz 代替 1Hz（1Hz 超出 C3 分频范围）
@@ -142,5 +163,30 @@ void pwm_ctrl_overtemp_alert(bool on)
             ledc_update_duty(LEDC_SPEED, s_chan[c]);
         }
     }
+    CLI_DEBUG(TAG, "over-temp alert %s", on ? "ON" : "OFF");
     // off: 由调用方 pwm_ctrl_apply_state() 恢复
+    pwm_ctrl_unlock();
+}
+
+// 运行时设置单通道输出（不写 NVS）。单通道仅瞬切；渐变由 apply_state 整体处理。
+void pwm_ctrl_set_channel(uint8_t ch, bool on, uint8_t state,
+                          uint32_t freq_override, uint16_t duty_override, bool instant)
+{
+    (void)instant;   // 保留参数匹配接口语义；单通道仅瞬切
+    if (ch >= PWM_CH_CNT) {
+        return;
+    }
+    pwm_ctrl_lock();
+
+    uint32_t freq = (freq_override > 0) ? freq_override : pwm_freq[ch][state];
+    uint16_t duty = (duty_override != 0xFFFF) ? duty_override : pwm_duty[ch][state];
+    if (!on) duty = 0;   // 逻辑 0%（经 duty_to_tick 受 pwm_inv 映射）
+
+    uint32_t target_tick = channel_prep(ch, freq, duty);
+    ledc_set_duty(LEDC_SPEED, s_chan[ch], target_tick);
+    ledc_update_duty(LEDC_SPEED, s_chan[ch]);
+
+    CLI_DEBUG(TAG, "set ch=%u on=%d state=%u freq=%lu duty=%u",
+              ch, on, state, (unsigned long)freq, duty);
+    pwm_ctrl_unlock();
 }

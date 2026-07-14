@@ -5,4 +5,5 @@ idf_component_register(SRCS "app.c"
                             "config_portal.c"
                             "temp_monitor.c"
                             "key.c"
+                            "cli.c"
                     INCLUDE_DIRS ".")
