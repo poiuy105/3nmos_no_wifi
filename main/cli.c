@@ -335,7 +335,7 @@ static int cmd_status(int argc, char **argv)
     bool ot = temp_monitor_is_overtemp();
     float t = temp_monitor_get_temp();
 
-    printf("\n================ 3NMOS STATUS ================\n");
+    printf("\n================ SYNAFLOW STATUS ================\n");
     printf("chip        : %s rev.%d\n", CONFIG_IDF_TARGET, chip.revision);
     printf("app version : %s  (build %s %s)\n", d->version, d->date, d->time);
     printf("run mode    : %s\n", s_work_mode ? "WORK" : "CONFIG");
@@ -528,7 +528,7 @@ static void cli_task(void *arg)
 
     const esp_app_desc_t *d = esp_app_get_description();
     printf("\n\n==============================================\n");
-    printf(" 3NMOS PWM Controller - CLI (%s)\n", CONFIG_IDF_TARGET);
+    printf(" SYNAFLOW PWM Controller - CLI (%s)\n", CONFIG_IDF_TARGET);
     printf(" version %s   build %s %s\n", d->version, d->date, d->time);
     printf(" mode: %s   type 'help' for commands\n", s_work_mode ? "WORK" : "CONFIG");
     printf("==============================================\n");
