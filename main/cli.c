@@ -12,8 +12,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/uart.h"
-#if CONFIG_IDF_TARGET_ESP32S3
-#include "driver/usb_serial_jtag.h"      // S3 原生 USB（USB-Serial-JTAG）
+#include "esp_err.h"
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#include "driver/usb_serial_jtag.h"
+#include "esp_vfs_usb_serial_jtag.h"
+#else
+#include "esp_vfs_dev.h"
 #endif
 #include "esp_log.h"
 #include "esp_system.h"
@@ -457,43 +461,36 @@ static int cmd_help(int argc, char **argv)
 }
 
 // ---------------- console 后端抽象 ----------------
-// RX 自适应；TX 始终走 ROM console（ESP_LOG/printf 自动适配后端，不受影响）。
-// C3：只有 UART0。
-// S3：原生 USB（USB-Serial-JTAG）与 UART0 都可能承载 console，故两个 RX 都装、轮询；
-//     无论 menuconfig 选哪个后端、是否经 USB-Serial-JTAG 桥接，都能收到上位机命令。
+// 装 driver 并绑 vfs（use_driver）：让 stdio 统一走 driver，fgets 阻塞读行
+// （既不忙等饿死看门狗、又能收到数据）。按 menuconfig 的 console 后端选择。
 static void cli_console_init(void)
 {
-    uart_driver_install(UART_NUM_0, 1024, 0, 0, NULL, 0);   // UART0 RX（C3 主用；S3 备用）
-#if CONFIG_IDF_TARGET_ESP32S3
-    usb_serial_jtag_driver_config_t ucfg = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
-    usb_serial_jtag_driver_install(&ucfg);                   // S3 原生 USB RX（失败也不影响 UART0）
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    usb_serial_jtag_driver_config_t cfg = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
+    esp_err_t e = usb_serial_jtag_driver_install(&cfg);
+    esp_vfs_usb_serial_jtag_use_driver();
+    ESP_LOGI(TAG, "console RX = USB-Serial-JTAG (driver_install=%s)", esp_err_to_name(e));
+#else
+    esp_err_t e = uart_driver_install(UART_NUM_0, 1024, 1024, 0, NULL, 0);
+    esp_vfs_dev_uart_use_driver(UART_NUM_0);
+    esp_vfs_dev_uart_port_set_rx_line_endings(UART_NUM_0, ESP_LINE_ENDINGS_CR);
+    esp_vfs_dev_uart_port_set_tx_line_endings(UART_NUM_0, ESP_LINE_ENDINGS_CRLF);
+    ESP_LOGI(TAG, "console RX = UART0 (driver_install=%s)", esp_err_to_name(e));
 #endif
-}
-
-static inline int cli_console_read_byte(uint8_t *c)
-{
-#if CONFIG_IDF_TARGET_ESP32S3
-    int r = usb_serial_jtag_read_bytes(c, 1, pdMS_TO_TICKS(5));
-    if (r > 0) return r;
-#endif
-    return uart_read_bytes(UART_NUM_0, c, 1, pdMS_TO_TICKS(5));
 }
 
 // ---------------- 行接收与分发 ----------------
+// fgets 经 vfs+driver 阻塞读一行；返回去掉 \r\n 后的长度，-1 表示 EOF/错误。
 static int cli_readline(char *buf, int maxlen)
 {
-    int i = 0;
-    while (i < maxlen - 1) {
-        uint8_t c;
-        int r = cli_console_read_byte(&c);
-        if (r <= 0) continue;
-        if (c == '\r' || c == '\n') { buf[i] = 0; return i; }
-        if (c == 0x08 || c == 0x7f) { if (i > 0) i--; continue; }   // 忽略退格（无行编辑）
-        if (c < 0x20 || c > 0x7e) continue;                          // 非打印忽略
-        buf[i++] = (char)c;
+    if (fgets(buf, maxlen, stdin) == NULL) {
+        return -1;
     }
-    buf[maxlen - 1] = 0;
-    return maxlen - 1;   // 超长截断
+    int n = strlen(buf);
+    while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r')) {
+        buf[--n] = 0;
+    }
+    return n;
 }
 
 static void cli_dispatch(char *line)
@@ -539,7 +536,11 @@ static void cli_task(void *arg)
 
     char line[CLI_LINE_MAX];
     while (1) {
-        cli_readline(line, CLI_LINE_MAX);
-        cli_dispatch(line);
+        int n = cli_readline(line, CLI_LINE_MAX);
+        if (n > 0) {
+            cli_dispatch(line);
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(50));   // fgets 返回 NULL（EOF/错误）时防忙；正常会阻塞等行
+        }
     }
 }
