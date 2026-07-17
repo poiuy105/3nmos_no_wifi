@@ -13,11 +13,10 @@
 #include "freertos/task.h"
 #include "driver/uart.h"
 #include "esp_err.h"
+#include "esp_vfs_dev.h"          // esp_vfs_dev_uart_use_driver (UART) / esp_vfs_dev_usb_serial_jtag_register
 #if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
 #include "driver/usb_serial_jtag.h"
 #include "esp_vfs_usb_serial_jtag.h"
-#else
-#include "esp_vfs_dev.h"
 #endif
 #include "esp_log.h"
 #include "esp_system.h"
@@ -468,7 +467,7 @@ static void cli_console_init(void)
 #if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
     usb_serial_jtag_driver_config_t cfg = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
     esp_err_t e = usb_serial_jtag_driver_install(&cfg);
-    esp_vfs_usb_serial_jtag_use_driver();
+    esp_vfs_dev_usb_serial_jtag_register();   // v5.2 API（v5.3+ 改名 esp_vfs_usb_serial_jtag_use_driver）
     ESP_LOGI(TAG, "console RX = USB-Serial-JTAG (driver_install=%s)", esp_err_to_name(e));
 #else
     esp_err_t e = uart_driver_install(UART_NUM_0, 1024, 1024, 0, NULL, 0);
