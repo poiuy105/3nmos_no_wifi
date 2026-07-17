@@ -467,7 +467,7 @@ static void cli_console_init(void)
 #if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
     usb_serial_jtag_driver_config_t cfg = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
     esp_err_t e = usb_serial_jtag_driver_install(&cfg);
-    esp_vfs_dev_usb_serial_jtag_register();   // v5.2 API（v5.3+ 改名 esp_vfs_usb_serial_jtag_use_driver）
+    esp_vfs_usb_serial_jtag_use_driver();   // v5.3 API：绑 driver 到 vfs，fgets 阻塞读 USB RX（v5.2 的 register 不绑 driver=收不到）
     ESP_LOGI(TAG, "console RX = USB-Serial-JTAG (driver_install=%s)", esp_err_to_name(e));
 #else
     esp_err_t e = uart_driver_install(UART_NUM_0, 1024, 1024, 0, NULL, 0);
