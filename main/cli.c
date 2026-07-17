@@ -12,6 +12,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/uart.h"
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#include "driver/usb_serial_jtag.h"      // S3 原生 USB console 后端
+#endif
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_chip_info.h"
@@ -453,13 +456,37 @@ static int cmd_help(int argc, char **argv)
     return 0;
 }
 
+// ---------------- console 后端抽象 ----------------
+// S3 原生 USB（复位源 USB_UART_CHIP_RESET）的 console 走 USB-Serial-JTAG，而非 UART0；
+// 这里按 menuconfig 选定的 console 后端选择 RX 通道。TX 始终走 ROM console（ESP_LOG/printf 不受影响）。
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+static void cli_console_init(void)
+{
+    usb_serial_jtag_driver_config_t cfg = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
+    usb_serial_jtag_driver_install(&cfg);   // 装 RX driver；TX/RX FIFO 全双工，与 ROM printf 不冲突
+}
+static inline int cli_console_read_byte(uint8_t *c)
+{
+    return usb_serial_jtag_read_bytes(c, 1, portMAX_DELAY);
+}
+#else
+static void cli_console_init(void)
+{
+    uart_driver_install(UART_NUM_0, 1024, 0, 0, NULL, 0);   // 仅装 RX；TX 走 ROM console
+}
+static inline int cli_console_read_byte(uint8_t *c)
+{
+    return uart_read_bytes(UART_NUM_0, c, 1, portMAX_DELAY);
+}
+#endif
+
 // ---------------- 行接收与分发 ----------------
 static int cli_readline(char *buf, int maxlen)
 {
     int i = 0;
     while (i < maxlen - 1) {
         uint8_t c;
-        int r = uart_read_bytes(UART_NUM_0, &c, 1, portMAX_DELAY);
+        int r = cli_console_read_byte(&c);
         if (r <= 0) continue;
         if (c == '\r' || c == '\n') { buf[i] = 0; return i; }
         if (c == 0x08 || c == 0x7f) { if (i > 0) i--; continue; }   // 忽略退格（无行编辑）
@@ -501,8 +528,8 @@ static void cli_dispatch(char *line)
 static void cli_task(void *arg)
 {
     (void)arg;
-    // 装 UART0 RX driver：仅用于命令接收；TX 仍走 ROM console，ESP_LOG/printf 不受影响。
-    uart_driver_install(UART_NUM_0, 1024, 0, 0, NULL, 0);
+    // 装 console RX driver（S3=USB-Serial-JTAG, C3=UART0）；TX 仍走 ROM console，ESP_LOG/printf 不受影响。
+    cli_console_init();
 
     const esp_app_desc_t *d = esp_app_get_description();
     printf("\n\n==============================================\n");
