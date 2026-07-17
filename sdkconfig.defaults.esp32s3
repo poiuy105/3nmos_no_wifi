@@ -1,0 +1,7 @@
+# ESP32-S3 target 专属配置（覆盖 sdkconfig.defaults）
+
+# 用原生 USB（USB-Serial-JTAG Controller）作为 console。
+# ESP-IDF 官方文档明确：只有选 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG，USB-Serial-JTAG 才接受输入
+# （选 UART_DEFAULT 时 USB-Serial-JTAG 仅输出日志，收不到串口命令）。
+# 串口 CLI 需要 USB 输入，故 S3 必须用 USB-Serial-JTAG 作 console。
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

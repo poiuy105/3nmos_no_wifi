@@ -464,6 +464,11 @@ static int cmd_help(int argc, char **argv)
 //     外置 TTL 桥用户的数据进 UART0 RX。两条都监听才能都收到。
 static void cli_console_init(void)
 {
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    ESP_LOGI(TAG, "console backend = USB-Serial-JTAG (USB RX 可接收)");
+#else
+    ESP_LOGI(TAG, "console backend = UART0 (USB-Serial-JTAG 仅输出, 收不到 USB 输入)");
+#endif
     esp_err_t eu = uart_driver_install(UART_NUM_0, 1024, 0, 0, NULL, 0);
 #if CONFIG_IDF_TARGET_ESP32S3
     usb_serial_jtag_driver_config_t ucfg = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
