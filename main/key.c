@@ -89,5 +89,5 @@ static void key_task(void *arg)
 
 void key_task_start(void)
 {
-    xTaskCreate(key_task, "key", 2048, NULL, 4, NULL);
+    xTaskCreate(key_task, "key", 4096, NULL, 4, NULL);   // 2048 经 USB-Serial-JTAG printf 易栈溢出
 }

@@ -34,7 +34,7 @@ bool input_sig_read_logical(void)
 
 void input_sig_start(void)
 {
-    xTaskCreate(input_sig_task, "input_sig", 2048, NULL, 5, NULL);
+    xTaskCreate(input_sig_task, "input_sig", 4096, NULL, 5, NULL);   // 2048 经 USB-Serial-JTAG printf 易栈溢出
 }
 
 static void input_sig_task(void *arg)
