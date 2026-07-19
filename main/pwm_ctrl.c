@@ -145,9 +145,11 @@ void pwm_ctrl_apply_state(bool logical_high, bool instant)
         if (!instant) vTaskDelay(step_tick);
     }
 
-    CLI_DEBUG(TAG, "apply %s-state fade=%lums duty=[%lu %lu %lu]",
+    CLI_DEBUG(TAG, "apply %s-state fade=%lums: ch1=%luHz %u.%u%%  ch2=%luHz %u.%u%%  ch3=%luHz %u.%u%%",
               logical_high ? "HI" : "LO", (unsigned long)T,
-              (unsigned long)target[0], (unsigned long)target[1], (unsigned long)target[2]);
+              (unsigned long)pwm_freq[0][state], (unsigned)(pwm_duty[0][state] / 10), (unsigned)(pwm_duty[0][state] % 10),
+              (unsigned long)pwm_freq[1][state], (unsigned)(pwm_duty[1][state] / 10), (unsigned)(pwm_duty[1][state] % 10),
+              (unsigned long)pwm_freq[2][state], (unsigned)(pwm_duty[2][state] / 10), (unsigned)(pwm_duty[2][state] % 10));
     pwm_ctrl_unlock();
 }
 
@@ -186,7 +188,7 @@ void pwm_ctrl_set_channel(uint8_t ch, bool on, uint8_t state,
     ledc_set_duty(LEDC_SPEED, s_chan[ch], target_tick);
     ledc_update_duty(LEDC_SPEED, s_chan[ch]);
 
-    CLI_DEBUG(TAG, "set ch=%u on=%d state=%u freq=%lu duty=%u",
-              ch, on, state, (unsigned long)freq, duty);
+    CLI_DEBUG(TAG, "set ch=%u on=%d state=%u freq=%luHz duty=%u.%u%%",
+              ch, on, state, (unsigned long)freq, (unsigned)(duty / 10), (unsigned)(duty % 10));
     pwm_ctrl_unlock();
 }
