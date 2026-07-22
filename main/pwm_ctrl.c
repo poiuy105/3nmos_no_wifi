@@ -16,9 +16,9 @@ static const char *TAG = "PWM";
 #define FADE_STEPS    30                    // 软件渐变步数
 
 // 每路独立 timer（独立频率）+ 独立 channel
-static const ledc_timer_t   s_timer[PWM_CH_CNT] = {LEDC_TIMER_0, LEDC_TIMER_1, LEDC_TIMER_2};
-static const ledc_channel_t s_chan[PWM_CH_CNT]  = {LEDC_CHANNEL_0, LEDC_CHANNEL_1, LEDC_CHANNEL_2};
-static const int            s_gpio[PWM_CH_CNT]  = {PIN_PWM1, PIN_PWM2, PIN_PWM3};
+static const ledc_timer_t   s_timer[PWM_CH_CNT] = {LEDC_TIMER_0};
+static const ledc_channel_t s_chan[PWM_CH_CNT]  = {LEDC_CHANNEL_0};
+static const int            s_gpio[PWM_CH_CNT]  = {PIN_PWM1};
 
 static uint32_t s_cur_freq[PWM_CH_CNT];
 static int      s_cur_res[PWM_CH_CNT];
@@ -145,11 +145,9 @@ void pwm_ctrl_apply_state(bool logical_high, bool instant)
         if (!instant) vTaskDelay(step_tick);
     }
 
-    CLI_DEBUG(TAG, "apply %s-state fade=%lums: ch1=%luHz %u.%u%%  ch2=%luHz %u.%u%%  ch3=%luHz %u.%u%%",
+    CLI_DEBUG(TAG, "apply %s-state fade=%lums: ch1=%luHz %u.%u%%",
               logical_high ? "HI" : "LO", (unsigned long)T,
-              (unsigned long)pwm_freq[0][state], (unsigned)(pwm_duty[0][state] / 10), (unsigned)(pwm_duty[0][state] % 10),
-              (unsigned long)pwm_freq[1][state], (unsigned)(pwm_duty[1][state] / 10), (unsigned)(pwm_duty[1][state] % 10),
-              (unsigned long)pwm_freq[2][state], (unsigned)(pwm_duty[2][state] / 10), (unsigned)(pwm_duty[2][state] % 10));
+              (unsigned long)pwm_freq[0][state], (unsigned)(pwm_duty[0][state] / 10), (unsigned)(pwm_duty[0][state] % 10));
     pwm_ctrl_unlock();
 }
 

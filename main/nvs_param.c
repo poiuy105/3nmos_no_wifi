@@ -11,15 +11,15 @@ uint8_t  cfg_ok      = 0;
 uint8_t  in_pin      = 10;
 uint8_t  in_inv      = 0;
 uint8_t  pwm_inv     = 0;
-uint32_t pwm_freq[PWM_CH_CNT][2] = {{1000, 1000}, {1000, 1000}, {1000, 1000}};
-uint16_t pwm_duty[PWM_CH_CNT][2] = {{500, 500}, {500, 500}, {500, 500}};
+uint32_t pwm_freq[PWM_CH_CNT][2] = {{1000, 1000}};
+uint16_t pwm_duty[PWM_CH_CNT][2] = {{500, 500}};
 uint16_t t_rise_ms   = 300;
 uint16_t t_fall_ms   = 300;
 int16_t  temp_thresh = 100;       // 过温阈值 °C
 
-// NVS key：3 路 × 2 状态 的频率与占空比
-static const char *k_freq[3][2] = {{"f0l", "f0h"}, {"f1l", "f1h"}, {"f2l", "f2h"}};
-static const char *k_duty[3][2] = {{"d0l", "d0h"}, {"d1l", "d1h"}, {"d2l", "d2h"}};
+// NVS key：1 路 × 2 状态 的频率与占空比
+static const char *k_freq[1][2] = {{"f0l", "f0h"}};
+static const char *k_duty[1][2] = {{"d0l", "d0h"}};
 
 void nvs_load_defaults(void)
 {

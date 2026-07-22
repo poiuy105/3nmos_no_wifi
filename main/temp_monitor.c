@@ -18,6 +18,9 @@ static const char *TAG = "TEMP";
 #define HYSTERESIS_DEG   5                // 解除滞后 °C
 #define SAMPLE_PERIOD_MS 2000             // 采样周期
 #define ALERT_TOGGLE_US  500000           // LED 翻转 500ms -> 1Hz/50%
+#if CONFIG_IDF_TARGET_ESP32S3
+#define FAN_ON_TEMP      40               // 风扇开启阈值 °C（高电平=开，<阈值立即关）
+#endif
 
 static volatile bool  s_overtemp  = false;
 static volatile float s_last_temp = TEMP_FAULT_VALUE;
@@ -81,6 +84,10 @@ static void temp_task(void *arg)
             if (read_temp(&t) == ESP_OK) {
                 s_last_temp = t;
                 CLI_DEBUG(TAG, "temp=%.1fC thr=%d alert=%d", t, temp_thresh, alert);
+#if CONFIG_IDF_TARGET_ESP32S3
+                // 风扇控制（独立于过温保护）：>FAN_ON_TEMP 开，<=FAN_ON_TEMP 关
+                gpio_set_level(PIN_FAN, (t > (float)FAN_ON_TEMP) ? 1 : 0);
+#endif
                 // 带滞后的状态机
                 if (!alert && t > (float)temp_thresh) {
                     alert = true;
@@ -120,6 +127,18 @@ void temp_monitor_start(void)
         .name = "ot_led"
     };
     esp_timer_create(&tcfg, &s_led_timer);
+
+#if CONFIG_IDF_TARGET_ESP32S3
+    // 风扇引脚初始化（高电平=开，初始关闭）
+    gpio_config_t fan_io = {0};
+    fan_io.pin_bit_mask = (1ULL << PIN_FAN);
+    fan_io.mode         = GPIO_MODE_OUTPUT;
+    fan_io.pull_up_en   = GPIO_PULLUP_DISABLE;
+    fan_io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    gpio_config(&fan_io);
+    gpio_set_level(PIN_FAN, 0);
+    ESP_LOGI(TAG, "fan control on GPIO%d (on > %dC)", PIN_FAN, FAN_ON_TEMP);
+#endif
 
     xTaskCreate(temp_task, "temp", 4096, NULL, 5, NULL);
 }

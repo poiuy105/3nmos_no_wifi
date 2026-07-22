@@ -93,9 +93,11 @@ static const char index_html[] =
 "<div class='c'>"
 "<table><tr><th>路</th><th colspan=2>低电平态</th><th colspan=2>高电平态</th></tr>"
 "<tr><th></th><th>频率Hz</th><th>占空比%</th><th>频率Hz</th><th>占空比%</th></tr>"
-"<tr><td>PWM1<br>(IO48)</td><td><input type=number id=f0l min=1 max=40000></td><td><input type=number id=d0l min=0 max=100 step=0.1></td><td><input type=number id=f0h min=1 max=40000></td><td><input type=number id=d0h min=0 max=100 step=0.1></td></tr>"
-"<tr><td>PWM2<br>(IO21)</td><td><input type=number id=f1l min=1 max=40000></td><td><input type=number id=d1l min=0 max=100 step=0.1></td><td><input type=number id=f1h min=1 max=40000></td><td><input type=number id=d1h min=0 max=100 step=0.1></td></tr>"
-"<tr><td>PWM3<br>(IO47)</td><td><input type=number id=f2l min=1 max=40000></td><td><input type=number id=d2l min=0 max=100 step=0.1></td><td><input type=number id=f2h min=1 max=40000></td><td><input type=number id=d2h min=0 max=100 step=0.1></td></tr>"
+#if CONFIG_IDF_TARGET_ESP32S3
+"<tr><td>PWM1<br>(IO47)</td><td><input type=number id=f0l min=1 max=40000></td><td><input type=number id=d0l min=0 max=100 step=0.1></td><td><input type=number id=f0h min=1 max=40000></td><td><input type=number id=d0h min=0 max=100 step=0.1></td></tr>"
+#else
+"<tr><td>PWM1<br>(IO10)</td><td><input type=number id=f0l min=1 max=40000></td><td><input type=number id=d0l min=0 max=100 step=0.1></td><td><input type=number id=f0h min=1 max=40000></td><td><input type=number id=d0h min=0 max=100 step=0.1></td></tr>"
+#endif
 "</table></div>"
 "<div class='c'>"
 "<div class='r'><label>低&rarr;高 时间(ms)</label><input type=number id=tr min=0 max=65535></div>"
@@ -111,8 +113,8 @@ static const char index_html[] =
 "<script>"
 "function g(id){return document.getElementById(id)}"
 "function pin(){var r=document.getElementsByName('ip');for(var i=0;i<r.length;i++)if(r[i].checked)return +r[i].value;return 10}"
-"function load(){fetch('/config').then(r=>r.json()).then(c=>{g('ii').checked=!!c.in_inv;g('pi').checked=!!c.pwm_inv;var r=document.getElementsByName('ip');for(var i=0;i<r.length;i++)r[i].checked=(+r[i].value===c.in_pin);for(var i=0;i<3;i++){g('f'+i+'l').value=c.ch[i].lo.f;g('d'+i+'l').value=c.ch[i].lo.d;g('f'+i+'h').value=c.ch[i].hi.f;g('d'+i+'h').value=c.ch[i].hi.d}g('tr').value=c.t_rise;g('tf').value=c.t_fall;g('tthr').value=c.t_thr;g('curt').textContent=(c.temp==null?'--':c.temp.toFixed(1))}).catch(e=>{g('s').className='er';g('s').textContent='加载失败'})}"
-"function sv(){var ch=[];for(var i=0;i<3;i++)ch.push({lo:{f:+g('f'+i+'l').value,d:+g('d'+i+'l').value},hi:{f:+g('f'+i+'h').value,d:+g('d'+i+'h').value}});var cfg={in_pin:pin(),in_inv:g('ii').checked?1:0,pwm_inv:g('pi').checked?1:0,ch:ch,t_rise:+g('tr').value,t_fall:+g('tf').value,t_thr:+g('tthr').value};g('s').className='';g('s').textContent='保存中...';fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(r=>r.json()).then(d=>{g('s').className=d.status==='success'?'ok':'er';g('s').textContent=d.status==='success'?'已保存，设备重启中...':'失败:'+(d.message||'')}).catch(e=>{g('s').className='er';g('s').textContent='网络错误'})}"
+"function load(){fetch('/config').then(r=>r.json()).then(c=>{g('ii').checked=!!c.in_inv;g('pi').checked=!!c.pwm_inv;var r=document.getElementsByName('ip');for(var i=0;i<r.length;i++)r[i].checked=(+r[i].value===c.in_pin);for(var i=0;i<1;i++){g('f'+i+'l').value=c.ch[i].lo.f;g('d'+i+'l').value=c.ch[i].lo.d;g('f'+i+'h').value=c.ch[i].hi.f;g('d'+i+'h').value=c.ch[i].hi.d}g('tr').value=c.t_rise;g('tf').value=c.t_fall;g('tthr').value=c.t_thr;g('curt').textContent=(c.temp==null?'--':c.temp.toFixed(1))}).catch(e=>{g('s').className='er';g('s').textContent='加载失败'})}"
+"function sv(){var ch=[];for(var i=0;i<1;i++)ch.push({lo:{f:+g('f'+i+'l').value,d:+g('d'+i+'l').value},hi:{f:+g('f'+i+'h').value,d:+g('d'+i+'h').value}});var cfg={in_pin:pin(),in_inv:g('ii').checked?1:0,pwm_inv:g('pi').checked?1:0,ch:ch,t_rise:+g('tr').value,t_fall:+g('tf').value,t_thr:+g('tthr').value};g('s').className='';g('s').textContent='保存中...';fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(r=>r.json()).then(d=>{g('s').className=d.status==='success'?'ok':'er';g('s').textContent=d.status==='success'?'已保存，设备重启中...':'失败:'+(d.message||'')}).catch(e=>{g('s').className='er';g('s').textContent='网络错误'})}"
 "function rs(){if(!confirm('恢复默认参数并重启？'))return;g('s').className='';g('s').textContent='恢复中...';fetch('/reset',{method:'POST'}).then(r=>r.json()).then(d=>{g('s').className='ok';g('s').textContent='已恢复，重启中...'}).catch(e=>{g('s').className='er';g('s').textContent='网络错误'})}"
 "load();"
 "</script></body></html>";
@@ -132,7 +134,7 @@ static esp_err_t config_get_handler(httpd_req_t *req)
     int n = snprintf(buf, sizeof(buf),
         "{\"in_pin\":%d,\"in_inv\":%d,\"pwm_inv\":%d,\"ch\":[",
         in_pin, in_inv, pwm_inv);
-    for (int c = 0; c < 3 && n < (int)sizeof(buf) - 80; c++) {
+    for (int c = 0; c < PWM_CH_CNT && n < (int)sizeof(buf) - 80; c++) {
         n += snprintf(buf + n, sizeof(buf) - n,
             "%s{\"lo\":{\"f\":%lu,\"d\":%u.%u},\"hi\":{\"f\":%lu,\"d\":%u.%u}}",
             c ? "," : "",
@@ -180,8 +182,8 @@ static esp_err_t save_handler(httpd_req_t *req)
     j = cJSON_GetObjectItem(root, "pwm_inv"); if (j) pwm_inv = (j->valueint != 0) ? 1 : 0;
 
     cJSON *ch = cJSON_GetObjectItem(root, "ch");
-    if (ch && cJSON_GetArraySize(ch) >= 3) {
-        for (int c = 0; c < 3; c++) {
+    if (ch && cJSON_GetArraySize(ch) >= 1) {
+        for (int c = 0; c < PWM_CH_CNT; c++) {
             cJSON *cc = cJSON_GetArrayItem(ch, c);
             cJSON *lo = cJSON_GetObjectItem(cc, "lo");
             cJSON *hi = cJSON_GetObjectItem(cc, "hi");

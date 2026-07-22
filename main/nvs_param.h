@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define PWM_CH_CNT   3          // 3 路 PWM
+#define PWM_CH_CNT   1          // 1 路 PWM
 #define PWM_STATE_LO 0          // 输入信号低电平对应状态
 #define PWM_STATE_HI 1          // 输入信号高电平对应状态
 
