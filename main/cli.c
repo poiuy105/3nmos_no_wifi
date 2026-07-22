@@ -362,8 +362,46 @@ static int cmd_status(int argc, char **argv)
     printf("  min heap   : %u B\n", (unsigned)esp_get_minimum_free_heap_size());
     printf("  cli stack hw: %u B  (task prio 3)\n", (unsigned)uxTaskGetStackHighWaterMark(NULL));
     printf("  cli debug  : %s\n", s_cli_debug ? "ON" : "OFF");
+#if CONFIG_IDF_TARGET_ESP32S3
+    printf("--- fan ---\n");
+    printf("  fan thresh : %d C\n", (int)fan_on_temp);
+    printf("  fan mode   : %s\n", temp_monitor_fan_get_mode()==FAN_MODE_AUTO ? "AUTO" : temp_monitor_fan_get_mode()==FAN_MODE_ON ? "ON" : "OFF");
+    printf("  fan running: %s\n", temp_monitor_fan_is_on() ? "YES" : "NO");
+#endif
     printf("==============================================\n");
     return 0;
+}
+
+// ---- fan ----
+static int cmd_set_fan(int argc, char **argv)
+{
+    if (argc < 2) { printf("ERR set-fan: usage: set-fan <0..125>\n"); return -1; }
+    uint32_t t;
+    if (!parse_u32(argv[1], &t) || t > 125) { printf("ERR set-fan: must be 0..125\n"); return -1; }
+    fan_on_temp = (uint8_t)t;
+    nvs_save_all_param();
+    printf("OK set-fan = %d C (saved)\n", fan_on_temp);
+    return 0;
+}
+
+static int cmd_fan(int argc, char **argv)
+{
+#if CONFIG_IDF_TARGET_ESP32S3
+    if (argc < 2) {
+        printf("fan: mode=%s running=%s (usage: fan <on|off|auto>)\n",
+               temp_monitor_fan_get_mode()==FAN_MODE_AUTO ? "AUTO" : temp_monitor_fan_get_mode()==FAN_MODE_ON ? "ON" : "OFF",
+               temp_monitor_fan_is_on() ? "YES" : "NO");
+        return 0;
+    }
+    if      (!strcmp(argv[1], "on"))   temp_monitor_fan_set_mode(FAN_MODE_ON);
+    else if (!strcmp(argv[1], "off"))  temp_monitor_fan_set_mode(FAN_MODE_OFF);
+    else if (!strcmp(argv[1], "auto")) temp_monitor_fan_set_mode(FAN_MODE_AUTO);
+    else { printf("ERR fan: must be on|off|auto\n"); return -1; }
+    printf("OK fan %s\n", argv[1]);
+    return 0;
+#else
+    printf("ERR fan: only on ESP32-S3\n"); return -1;
+#endif
 }
 
 // ---------------- 命令表 ----------------
@@ -415,6 +453,8 @@ static const cli_cmd_t s_cmds[] = {
       "set-pwminv <0|1>\n  立即生效。仅 WORK 模式", cmd_set_pwminv, false, true },
     { "set-temp", "set", "持久设定过温阈值(°C)",
       "set-temp <0..125>\n  仅 WORK 模式", cmd_set_temp, false, true },
+    { "set-fan", "set", "持久设定风扇开启阈值(°C)",
+      "set-fan <0..125>\n  默认 40。仅 WORK 模式", cmd_set_fan, false, true },
 
     { "restart", "system", "软重启",
       "restart confirm\n  危险：需 confirm 令牌", cmd_restart, true, false },
@@ -427,6 +467,9 @@ static const cli_cmd_t s_cmds[] = {
 
     { "debug", "debug", "事件详细日志开关",
       "debug <on|off>\n  开启后打印 PWM 切换/输入跳变/温度采样等事件", cmd_debug, false, false },
+
+    { "fan", "fan", "风扇控制(on/off/auto)",
+      "fan <on|off|auto>\n  auto=按阈值自动, on=强制开, off=强制关。仅 S3", cmd_fan, false, true },
 };
 #define CMD_COUNT (sizeof(s_cmds) / sizeof(s_cmds[0]))
 
@@ -447,7 +490,7 @@ static int cmd_help(int argc, char **argv)
         if (c->work_only && !s_work_mode) printf("  [WORK mode only]\n");
         return 0;
     }
-    const char *groups[] = { "help", "status", "pwm", "set", "system", "debug" };
+    const char *groups[] = { "help", "status", "pwm", "set", "system", "debug", "fan" };
     printf("commands (* = dangerous, append 'confirm'; pwm/set = WORK only):\n");
     for (size_t g = 0; g < sizeof(groups) / sizeof(groups[0]); g++) {
         printf("[%s]\n", groups[g]);

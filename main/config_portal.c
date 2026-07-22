@@ -105,6 +105,7 @@ static const char index_html[] =
 "</div>"
 "<div class='c'>"
 "<div class='r'><label>温度阈值(°C)</label><input type=number id=tthr min=0 max=125 value=100></div>"
+"<div class='r'><label>风扇开启(°C)</label><input type=number id=fon min=0 max=125 value=40></div>"
 "<div class='r'><label>当前温度</label><span id=curt>--</span> °C</div>"
 "</div>"
 "<button class='b1' onclick='sv()'>保存并重启</button>"
@@ -113,8 +114,8 @@ static const char index_html[] =
 "<script>"
 "function g(id){return document.getElementById(id)}"
 "function pin(){var r=document.getElementsByName('ip');for(var i=0;i<r.length;i++)if(r[i].checked)return +r[i].value;return 10}"
-"function load(){fetch('/config').then(r=>r.json()).then(c=>{g('ii').checked=!!c.in_inv;g('pi').checked=!!c.pwm_inv;var r=document.getElementsByName('ip');for(var i=0;i<r.length;i++)r[i].checked=(+r[i].value===c.in_pin);for(var i=0;i<1;i++){g('f'+i+'l').value=c.ch[i].lo.f;g('d'+i+'l').value=c.ch[i].lo.d;g('f'+i+'h').value=c.ch[i].hi.f;g('d'+i+'h').value=c.ch[i].hi.d}g('tr').value=c.t_rise;g('tf').value=c.t_fall;g('tthr').value=c.t_thr;g('curt').textContent=(c.temp==null?'--':c.temp.toFixed(1))}).catch(e=>{g('s').className='er';g('s').textContent='加载失败'})}"
-"function sv(){var ch=[];for(var i=0;i<1;i++)ch.push({lo:{f:+g('f'+i+'l').value,d:+g('d'+i+'l').value},hi:{f:+g('f'+i+'h').value,d:+g('d'+i+'h').value}});var cfg={in_pin:pin(),in_inv:g('ii').checked?1:0,pwm_inv:g('pi').checked?1:0,ch:ch,t_rise:+g('tr').value,t_fall:+g('tf').value,t_thr:+g('tthr').value};g('s').className='';g('s').textContent='保存中...';fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(r=>r.json()).then(d=>{g('s').className=d.status==='success'?'ok':'er';g('s').textContent=d.status==='success'?'已保存，设备重启中...':'失败:'+(d.message||'')}).catch(e=>{g('s').className='er';g('s').textContent='网络错误'})}"
+"function load(){fetch('/config').then(r=>r.json()).then(c=>{g('ii').checked=!!c.in_inv;g('pi').checked=!!c.pwm_inv;var r=document.getElementsByName('ip');for(var i=0;i<r.length;i++)r[i].checked=(+r[i].value===c.in_pin);for(var i=0;i<1;i++){g('f'+i+'l').value=c.ch[i].lo.f;g('d'+i+'l').value=c.ch[i].lo.d;g('f'+i+'h').value=c.ch[i].hi.f;g('d'+i+'h').value=c.ch[i].hi.d}g('tr').value=c.t_rise;g('tf').value=c.t_fall;g('tthr').value=c.t_thr;g('fon').value=c.fon;g('curt').textContent=(c.temp==null?'--':c.temp.toFixed(1))}).catch(e=>{g('s').className='er';g('s').textContent='加载失败'})}"
+"function sv(){var ch=[];for(var i=0;i<1;i++)ch.push({lo:{f:+g('f'+i+'l').value,d:+g('d'+i+'l').value},hi:{f:+g('f'+i+'h').value,d:+g('d'+i+'h').value}});var cfg={in_pin:pin(),in_inv:g('ii').checked?1:0,pwm_inv:g('pi').checked?1:0,ch:ch,t_rise:+g('tr').value,t_fall:+g('tf').value,t_thr:+g('tthr').value,fon:+g('fon').value};g('s').className='';g('s').textContent='保存中...';fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(r=>r.json()).then(d=>{g('s').className=d.status==='success'?'ok':'er';g('s').textContent=d.status==='success'?'已保存，设备重启中...':'失败:'+(d.message||'')}).catch(e=>{g('s').className='er';g('s').textContent='网络错误'})}"
 "function rs(){if(!confirm('恢复默认参数并重启？'))return;g('s').className='';g('s').textContent='恢复中...';fetch('/reset',{method:'POST'}).then(r=>r.json()).then(d=>{g('s').className='ok';g('s').textContent='已恢复，重启中...'}).catch(e=>{g('s').className='er';g('s').textContent='网络错误'})}"
 "load();"
 "</script></body></html>";
@@ -142,7 +143,7 @@ static esp_err_t config_get_handler(httpd_req_t *req)
             (unsigned long)pwm_freq[c][1], pwm_duty[c][1] / 10, pwm_duty[c][1] % 10);
     }
     n += snprintf(buf + n, sizeof(buf) - n,
-        "],\"t_rise\":%d,\"t_fall\":%d,\"t_thr\":%d,\"temp\":", t_rise_ms, t_fall_ms, temp_thresh);
+        "],\"t_rise\":%d,\"t_fall\":%d,\"t_thr\":%d,\"fon\":%d,\"temp\":", t_rise_ms, t_fall_ms, temp_thresh, fan_on_temp);
     float cur_t = temp_monitor_get_temp();
     if (cur_t < -100.0f) n += snprintf(buf + n, sizeof(buf) - n, "null");
     else                 n += snprintf(buf + n, sizeof(buf) - n, "%.1f", cur_t);
@@ -204,6 +205,13 @@ static esp_err_t save_handler(httpd_req_t *req)
         if (v < 0) v = 0;
         if (v > 125) v = 125;
         temp_thresh = v;
+    }
+    j = cJSON_GetObjectItem(root, "fon");
+    if (j) {
+        int v = (int)j->valuedouble;
+        if (v < 0) v = 0;
+        if (v > 125) v = 125;
+        fan_on_temp = v;
     }
 
     cJSON_Delete(root);

@@ -19,7 +19,9 @@ static const char *TAG = "TEMP";
 #define SAMPLE_PERIOD_MS 2000             // 采样周期
 #define ALERT_TOGGLE_US  500000           // LED 翻转 500ms -> 1Hz/50%
 #if CONFIG_IDF_TARGET_ESP32S3
-#define FAN_ON_TEMP      40               // 风扇开启阈值 °C（高电平=开，<阈值立即关）
+#define FAN_ON_TEMP      40               // 风扇开启阈值 °C 默认值（实际用 fan_on_temp NVS 参数）
+static volatile fan_mode_t s_fan_mode = FAN_MODE_AUTO;
+static volatile bool       s_fan_on  = false;
 #endif
 
 static volatile bool  s_overtemp  = false;
@@ -30,6 +32,11 @@ static volatile bool s_led_on = false;
 
 bool  temp_monitor_is_overtemp(void) { return s_overtemp; }
 float temp_monitor_get_temp(void)    { return s_last_temp; }
+#if CONFIG_IDF_TARGET_ESP32S3
+void      temp_monitor_fan_set_mode(fan_mode_t mode) { s_fan_mode = mode; }
+fan_mode_t temp_monitor_fan_get_mode(void)            { return s_fan_mode; }
+bool      temp_monitor_fan_is_on(void)                { return s_fan_on; }
+#endif
 
 // 独立定时器翻转 LED，避免被 DS18B20 750ms 转换阻塞影响
 static void led_timer_cb(void *arg)
@@ -47,6 +54,7 @@ static esp_err_t init_ds18b20(void)
     };
     esp_err_t err = onewire_new_bus_rmt(&bus_cfg, &rmt_cfg, &bus);
     if (err != ESP_OK) { ESP_LOGE(TAG, "1-wire bus fail: %s", esp_err_to_name(err)); return err; }
+    gpio_set_pull_mode(TEMP_SENSOR_GPIO, GPIO_PULLUP_ONLY);   // 启用内部上拉（无外部上拉时必需）
 
     onewire_device_iter_handle_t iter = NULL;
     onewire_new_device_iter(bus, &iter);
@@ -84,10 +92,6 @@ static void temp_task(void *arg)
             if (read_temp(&t) == ESP_OK) {
                 s_last_temp = t;
                 CLI_DEBUG(TAG, "temp=%.1fC thr=%d alert=%d", t, temp_thresh, alert);
-#if CONFIG_IDF_TARGET_ESP32S3
-                // 风扇控制（独立于过温保护）：>FAN_ON_TEMP 开，<=FAN_ON_TEMP 关
-                gpio_set_level(PIN_FAN, (t > (float)FAN_ON_TEMP) ? 1 : 0);
-#endif
                 // 带滞后的状态机
                 if (!alert && t > (float)temp_thresh) {
                     alert = true;
@@ -115,6 +119,18 @@ static void temp_task(void *arg)
             pwm_ctrl_overtemp_alert(false);
             pwm_ctrl_apply_state(input_sig_read_logical(), true);   // 恢复当前输入对应输出
         }
+
+#if CONFIG_IDF_TARGET_ESP32S3
+        // 风扇控制（每周期）：auto=按 fan_on_temp, on=强制开, off=强制关
+        {
+            bool want_on;
+            if (s_fan_mode == FAN_MODE_ON)       want_on = true;
+            else if (s_fan_mode == FAN_MODE_OFF) want_on = false;
+            else                                 want_on = (s_last_temp > (float)fan_on_temp);
+            s_fan_on = want_on;
+            gpio_set_level(PIN_FAN, want_on ? 1 : 0);
+        }
+#endif
 
         vTaskDelay(pdMS_TO_TICKS(SAMPLE_PERIOD_MS));
     }

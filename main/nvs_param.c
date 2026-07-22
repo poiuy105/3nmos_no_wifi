@@ -16,6 +16,7 @@ uint16_t pwm_duty[PWM_CH_CNT][2] = {{500, 500}};
 uint16_t t_rise_ms   = 300;
 uint16_t t_fall_ms   = 300;
 int16_t  temp_thresh = 100;       // 过温阈值 °C
+uint8_t  fan_on_temp = 40;        // 风扇开启阈值 °C
 
 // NVS key：1 路 × 2 状态 的频率与占空比
 static const char *k_freq[1][2] = {{"f0l", "f0h"}};
@@ -36,6 +37,7 @@ void nvs_load_defaults(void)
     t_rise_ms   = 300;
     t_fall_ms   = 300;
     temp_thresh = 100;
+    fan_on_temp = 40;
 }
 
 void nvs_read_all_param(void)
@@ -63,6 +65,7 @@ void nvs_read_all_param(void)
     nvs_get_u16(h, "t_rise", &t_rise_ms);
     nvs_get_u16(h, "t_fall", &t_fall_ms);
     nvs_get_i16(h, "tthr",   &temp_thresh);
+    nvs_get_u8(h, "fon",    &fan_on_temp);
 
     nvs_close(h);
 
@@ -70,9 +73,10 @@ void nvs_read_all_param(void)
     if (in_pin != PIN_IN1 && in_pin != PIN_IN2) in_pin = PIN_IN1;
     if (temp_thresh < 0)   temp_thresh = 0;
     if (temp_thresh > 125) temp_thresh = 125;
+    if (fan_on_temp > 125) fan_on_temp = 125;
 
-    ESP_LOGI(TAG, "loaded: cfg_ok=%d in_pin=%d inv=%d/%d trise=%d tfall=%d tthr=%d",
-             cfg_ok, in_pin, in_inv, pwm_inv, t_rise_ms, t_fall_ms, temp_thresh);
+    ESP_LOGI(TAG, "loaded: cfg_ok=%d in_pin=%d inv=%d/%d trise=%d tfall=%d tthr=%d fon=%d",
+             cfg_ok, in_pin, in_inv, pwm_inv, t_rise_ms, t_fall_ms, temp_thresh, fan_on_temp);
 }
 
 void nvs_save_all_param(void)
@@ -97,6 +101,7 @@ void nvs_save_all_param(void)
     nvs_set_u16(h, "t_rise", t_rise_ms);
     nvs_set_u16(h, "t_fall", t_fall_ms);
     nvs_set_i16(h, "tthr",   temp_thresh);
+    nvs_set_u8(h, "fon",    fan_on_temp);
 
     nvs_commit(h);
     nvs_close(h);

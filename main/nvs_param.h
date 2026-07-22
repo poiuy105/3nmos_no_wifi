@@ -16,6 +16,7 @@ extern uint16_t pwm_duty[PWM_CH_CNT][2];    // [ch][lo/hi] 占空比 ×10（500=
 extern uint16_t t_rise_ms;                  // 低→高 平滑切换时间 ms
 extern uint16_t t_fall_ms;                  // 高→低 平滑切换时间 ms
 extern int16_t  temp_thresh;                // 过温阈值 °C（默认 100）
+extern uint8_t  fan_on_temp;                // 风扇开启阈值 °C（默认 40）
 
 void nvs_read_all_param(void);
 void nvs_save_all_param(void);
